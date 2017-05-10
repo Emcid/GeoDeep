@@ -9,6 +9,7 @@ Version: v0.01
 
 import pandas as pd
 import numpy as np
+from netCDF4 import Dataset
 
 class WeatherFrame(pd.DataFrame):
     """
@@ -124,8 +125,10 @@ class GridFrame(list):
             rivers=[]
             weathers=[]
             for i in range(len(x)):
-                rivers.append([x[i][j]['river'].loc[timepoint] for j in range(len(x[i]))])
-                weathers.append([x[i][j]['weather'].loc[timepoint] for j in range(len(x[i]))])
+                rivers.append([x[i][j]['river'].loc[timepoint] \
+                               for j in range(len(x[i]))])
+                weathers.append([x[i][j]['weather'].loc[timepoint]\
+                                 for j in range(len(x[i]))])
             return rivers, weathers
     
     """
@@ -150,5 +153,17 @@ import matplotlib.pyplot as plt
 fig, axes = plt.subplots(nrows=len(x), ncols=max([len(x[i]) for i in range(len(x))]))
 for i in range(len(x)):
     for j in range(len(x[i])):
-        x[i][j]['river'].plot(ax=axes[i,j], xticks=[], ylim=[0,30], use_index=False)
+        x[i][j]['river'].plot(ax=axes[i,j], xticks=[], ylim=[0,50], use_index=False)
+
+for nfile in [00,01,10,11]:
+    f = Dataset('mftest'+repr(nfile)+'.nc','w',format='NETCDF4_CLASSIC')
+    f.createDimension('x',None)
+    x = f.createVariable('x','i',('x',))
+    x[0:10] = numpy.arange(nfile*10,10*(nfile+1))
+    f.close()
+# now read all those files in at once, in one Dataset.
+from netCDF4 import MFDataset
+f = MFDataset('mftest*nc')
+print(f.variables['x'][:])
 #x[0][1]['river'].plot() #Everything flows here!
+
