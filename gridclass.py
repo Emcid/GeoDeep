@@ -19,15 +19,18 @@ class WeatherFrame(pd.DataFrame):
     rng: date range
     x,y: coordinates in grid, probably will be useful later
     """
-    def __init__(self, river=10,
-                 weather=10*np.random.rand(len(rng)),
+    def __init__(self, river=10,\
+                 weather=None,
                  height=10*np.random.rand(1)[0],\
                  rng=pd.date_range('1/1/2017', periods=24, freq='H'),\
                  x=0,y=0):
         super(WeatherFrame, self).__init__(index=rng)
         self['river']=0
         self['river'].iloc[0]=river
-        self['weather']=weather
+        if weather==None:
+            self['weather']=np.random.uniform(low=-1, high=1, size=len(rng))
+        else:
+            self['weather']=weather
         self.height=height
         self.rng=rng
         
@@ -54,7 +57,7 @@ class GridFrame(list):
     cf. Weather Frame
     """
     def __init__(self, x=1,y=1, river=10,\
-                 weather=10*np.random.rand(len(rng)),\
+                 weather=None,\
                  height=10*np.random.rand(1)[0],\
                  rng=pd.date_range('1/1/2017',periods=24,freq='H')):
         super(list, self).__init__()
@@ -85,14 +88,15 @@ class GridFrame(list):
                    self[x][y].height>self[x+i][y+j].height and i*j==0:
                     nhb.append(self[x+i][y+j])
                     indices.append((x+i, y+j))
-        return nhb, indices
+        return zip(nhb,indices)
             
-    def progress_rivers(self):
+    def progress_rivers(self, random=0):
         """
         Rivers flow at a rate of difference of heights to 
         orthogonally adjacent grids of lower height
         The value of 'weather' at previous timestep gets added 
         to the value of 'river' 
+        'random' governs the amount of randomness, 0 for deterministic
         *.loc used to avoid SettingWithCopy pandas error
         Currently fully deterministic
         """
@@ -101,15 +105,28 @@ class GridFrame(list):
                 for j in range(self.y):
                     self[i][j].loc[timestep,'river']=\
                                 self[i][j].loc[timestep-1, 'river']
-                    for neighbour in self.lower_neighbours(i,j)[0]:
-                        delta=self[i][j].height-neighbour.height
-                        if self[i][j]['river'][timestep]>=delta:
-                            self[i][j].loc[timestep,'river']-=delta
-                            neighbour.loc[timestep,'river']=\
-                                neighbour.loc[timestep-1,'river']+delta
                     self[i][j].loc[timestep, 'river']+=\
                                 self[i][j]['weather'][timestep-1]
+                    for neighbour in self.lower_neighbours(i,j):
+                        delta=self[i][j].height-neighbour[0].height+\
+                                  random*(np.random.random()-0.5)
+                        if self[i][j]['river'][timestep]>=delta:
+                            self[i][j].loc[timestep,'river']-=delta
+                            neighbour[0].loc[timestep,'river']=\
+                                neighbour[0].loc[timestep-1,'river']+delta
 
+                                
+                                
+    def show_timepoint(self,timepoint):
+        if timepoint not in self.rng:
+            return -1
+        else:
+            rivers=[]
+            weathers=[]
+            for i in range(len(x)):
+                rivers.append([x[i][j]['river'].loc[timepoint] for j in range(len(x[i]))])
+                weathers.append([x[i][j]['weather'].loc[timepoint] for j in range(len(x[i]))])
+            return rivers, weathers
     
     """
     TO ADD:
@@ -117,7 +134,6 @@ class GridFrame(list):
          - more complicated topography rather than "height" (slope directions)
          - more than one river in a grid?
          - progress_weathers?
-         - modify progress_rivers to allow some randomness
          - method to display the grid at a timepoint (__str__)
     """
 
@@ -126,11 +142,13 @@ x=GridFrame(x=2,y=2)
 for i in range(len(x)):
     for j in range(len(x[i])):
         x[i][j].set_initial_river(12)
-        x[i][j].set_height(1)
-        x[i][j]['weather']=0
-x[0][1].height=0 #This ensures all rivers flow to x[0][1] and no weather
+        x[i][j].set_height(5*np.random.random())
 
-x.progress_rivers()
-import matplotlib as plt
+x.progress_rivers(random=0)
+import matplotlib.pyplot as plt
 
-x[0][1]['river'].plot() #Everything flows here!
+fig, axes = plt.subplots(nrows=len(x), ncols=max([len(x[i]) for i in range(len(x))]))
+for i in range(len(x)):
+    for j in range(len(x[i])):
+        x[i][j]['river'].plot(ax=axes[i,j], xticks=[], ylim=[0,30], use_index=False)
+#x[0][1]['river'].plot() #Everything flows here!
